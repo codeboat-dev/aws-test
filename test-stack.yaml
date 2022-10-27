@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Lambda with HTTP API gateway demo stack
+
+Resources:
+  ##########################################
+  ##  create your API gateway resources   ##
+  ##  as described in my previous post    ##
+  ##########################################
+
+  DemoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: "nodejs12.x"
+      InlineCode: |
+        exports.handler = function(event, context, callback) {
+            console.log(event);
+            const response = {
+                statusCode: 200,
+                body: JSON.stringify('Hello Node rule 1')
+            };
+            callback(null, response);
+        };
+
+  DemoLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DemoFunction
+      Action: "lambda:InvokeFunction"
+      Principal: apigateway.amazonaws.com
+
+  DemoIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref DemoHttpApi
+      Description: Lambda proxy integration
+      IntegrationType: AWS_PROXY
+      IntegrationMethod: POST
+      PayloadFormatVersion: "2.0"
+      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DemoFunction.Arn}/invocations'
+
+  DemoApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref DemoHttpApi
+      RouteKey: "GET /demo"
+      AuthorizationType: AWS_IAM
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref DemoIntegration
